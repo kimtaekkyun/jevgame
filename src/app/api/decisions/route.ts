@@ -1,6 +1,8 @@
 import { OpenRouter } from "@openrouter/sdk";
 import type { DecisionsRequest } from "@openrouter/sdk/models";
+import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { ACCESS_COOKIE_NAME, isAccessTokenValid } from "@/lib/access";
 
 export const runtime = "nodejs";
 
@@ -24,6 +26,11 @@ const SAFE_KEY = /^[a-zA-Z0-9_-]{1,48}$/;
 const IMAGE_DATA_URL = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/;
 
 export async function POST(request: Request) {
+  const cookieStore = await cookies();
+  if (!isAccessTokenValid(cookieStore.get(ACCESS_COOKIE_NAME)?.value)) {
+    return NextResponse.json({ error: "입장 코드를 먼저 입력해 주세요." }, { status: 401 });
+  }
+
   const typesafeApiKey = process.env.TYPESAFE_API_KEY?.trim();
   const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim();
   const provider = typesafeApiKey ? "typesafe" : openRouterApiKey ? "openrouter" : null;

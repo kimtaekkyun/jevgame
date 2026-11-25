@@ -25,6 +25,21 @@ APP_URL=http://localhost:3000
 
 키는 서버 환경 변수로만 관리하고 `NEXT_PUBLIC_` 접두사를 붙이지 마세요. 선택된 제공자의 요청이 실패하면 다른 제공자로 재시도하지 않고 오류를 반환합니다.
 
+앱을 공개하기 전에 입장 잠금을 설정합니다. `ENTRY_CODE`는 초대할 사람에게 공유할 코드이고, `ACCESS_SESSION_SECRET`은 서명용 무작위 비밀값입니다. 예를 들어 다음 명령으로 서명용 값을 생성할 수 있습니다.
+
+```bash
+openssl rand -base64 32
+```
+
+생성된 값을 포함해 두 변수를 로컬 `.env.local` 또는 Vercel의 서버 환경 변수(Secret)에 설정하세요.
+
+```env
+ENTRY_CODE=길고_추측하기_어려운_초대_코드
+ACCESS_SESSION_SECRET=위_명령으로_생성한_무작위_값
+```
+
+입장 세션은 7일 동안 유지되고, `ENTRY_CODE`를 바꾸면 기존 세션도 만료됩니다. 공유 코드 방식은 간단한 접근 제한용이므로, 공개 서비스의 강한 사용자 인증이나 요청별 rate limit을 대신하지는 않습니다.
+
 ```bash
 npm run dev
 ```

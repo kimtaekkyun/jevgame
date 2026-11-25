@@ -516,7 +516,7 @@ export default function Home() {
         <a className="brand" href="#top" aria-label="인생은 객관식 홈">
           <span className="brand-mark">객</span><span>인생은 객관식</span>
         </a>
-        <div className="app-tagline">답은 Jev가, 책임은 당신이 · <span className="model-pill"><span className="live-dot" /> JEV · TYPESAFE</span></div>
+        <div className="app-tagline">답은 Jev가, 책임은 당신이 · <span className="model-pill"><span className="live-dot" /> JEV · DECISIONS</span></div>
       </header>
 
       <div className="template-strip">

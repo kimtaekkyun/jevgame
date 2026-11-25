@@ -24,11 +24,15 @@ const SAFE_KEY = /^[a-zA-Z0-9_-]{1,48}$/;
 const IMAGE_DATA_URL = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]+={0,2}$/;
 
 export async function POST(request: Request) {
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  const model = process.env.OPENROUTER_MODEL ?? "~typesafe/jev-latest";
+  const typesafeApiKey = process.env.TYPESAFE_API_KEY?.trim();
+  const openRouterApiKey = process.env.OPENROUTER_API_KEY?.trim();
+  const provider = typesafeApiKey ? "typesafe" : openRouterApiKey ? "openrouter" : null;
 
-  if (!apiKey) {
-    return NextResponse.json({ error: "OPENROUTER_API_KEY를 서버 환경변수에 설정해 주세요." }, { status: 503 });
+  if (!provider) {
+    return NextResponse.json(
+      { error: "TYPESAFE_API_KEY 또는 OPENROUTER_API_KEY를 서버 환경변수에 설정해 주세요." },
+      { status: 503 },
+    );
   }
 
   let body: { state?: unknown; imageDataUrl?: unknown; questions?: unknown };
@@ -134,19 +138,76 @@ export async function POST(request: Request) {
   }
 
   const baseState = (validState ? rawState : "첨부된 이미지") as DecisionsRequest["state"];
-  const state: DecisionsRequest["state"] = imageDataUrl
+
+  if (provider === "typesafe") {
+    const assets: Record<string, { type: "image"; format: "png" | "jpeg"; data_base64: string }> = {};
+    let state: unknown = baseState;
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${typesafeApiKey}`,
+      "Content-Type": "application/json",
+    };
+
+    if (imageDataUrl) {
+      const assetId = "uploaded_image";
+      const [, mimeType, data] = imageDataUrl.match(/^data:image\/(png|jpeg);base64,([A-Za-z0-9+/]+={0,2})$/)!;
+      const imageFormat = mimeType as "png" | "jpeg";
+      const stateWithImage = Array.isArray(baseState) ? [...baseState, assetId] : [baseState, assetId];
+      state = stateWithImage;
+      assets[assetId] = { type: "image", format: imageFormat, data_base64: data };
+      headers["TypeSafe-Danger-Zone-Images"] = "true";
+    }
+
+    try {
+      const response = await fetch("https://api.typesafe.ai/v1/systemone", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: process.env.TYPESAFE_MODEL?.trim() || "jev-latest",
+          state,
+          questions,
+          ...(imageDataUrl ? { assets } : {}),
+        }),
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        console.error(`TypeSafe Jev request failed with status ${response.status}.`);
+        return NextResponse.json(
+          { error: "TypeSafe 요청에 실패했습니다. API 키, 모델 ID, 질문 입력 또는 TypeSafe 응답을 확인해 주세요." },
+          { status: 502 },
+        );
+      }
+
+      const decision = await response.json();
+      return NextResponse.json({
+        model: decision.model,
+        provider: "TypeSafe",
+        answers: decision.answers,
+        usage: decision.usage,
+      });
+    } catch (error) {
+      console.error("TypeSafe Jev request failed:", error);
+      return NextResponse.json(
+        { error: "TypeSafe 요청을 완료하지 못했습니다. 네트워크 연결을 확인해 주세요." },
+        { status: 502 },
+      );
+    }
+  }
+
+  const openRouterModel = process.env.OPENROUTER_MODEL ?? "~typesafe/jev-latest";
+  const openRouterState: DecisionsRequest["state"] = imageDataUrl
     ? [...(Array.isArray(baseState) ? baseState : [baseState]), { type: "image_url", image_url: { url: imageDataUrl } }]
     : baseState;
 
   try {
     const openrouter = new OpenRouter({
-      apiKey,
+      apiKey: openRouterApiKey!,
       httpReferer: process.env.APP_URL ?? "http://localhost:3000",
       appTitle: "인생은 객관식",
     });
 
     const decision = await openrouter.alpha.decisions.create({
-      decisionsRequest: { model, state, questions },
+      decisionsRequest: { model: openRouterModel, state: openRouterState, questions },
     });
 
     return NextResponse.json({

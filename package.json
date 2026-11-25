@@ -4,7 +4,6 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "jev": "node --env-file=.env.local scripts/jev.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint ."
